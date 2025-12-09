@@ -42,24 +42,30 @@ class L2Norm(nn.Module):
         return F.normalize(x, p=2, dim=self.dim)
 
 
-class AttentionUNet(nn.Module):
+
+
+class MiniAttentionUNet(nn.Module):
     def __init__(self, in_channels=1024, mid_channels=256, out_channels=1):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, mid_channels, 3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(mid_channels, out_channels, 3, stride=1, padding=1),
-            nn.Sigmoid()  # output attention map ∈ [0,1]
+
+        self.encoder = nn.Conv2d(in_channels, mid_channels, kernel_size=1)
+        self.Wg = nn.Conv2d(mid_channels, 1, kernel_size=1)
+        self.Wx = nn.Conv2d(mid_channels, 1, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
+        self.out = nn.Sequential(
+            nn.Conv2d(mid_channels, out_channels, kernel_size=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        x1 = self.encoder(x)     # (B, mid, H, W)
+        g = x1
+        alpha = self.sigmoid(self.Wg(g) + self.Wx(x1))
+        x_att = x1 * alpha
+        mask = self.out(x_att)
+        return mask
+
+
 
 
 # ------------------------ Main VPR Model ----------------------------
